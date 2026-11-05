@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Первый AI eval: конспект воркшопа Arize</title>
+<meta name="description" content="Конспект воркшопа SallyAnn DeLucia (Arize AI) на AI Engineer NYC: от проверки «на глаз» к LLM-судье с критериями pass/fail.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0e14; --bg2:#11161f; --card:#151b26; --card2:#1a2230; --line:rgba(255,255,255,.08);
+  --text:#eef2f8; --muted:#b6c2d2; --dim:#8a98ad;
+  --pink:#ff4fa3; --lime:#c8f051; --violet:#a58bff; --amber:#f2b35c; --cyan:#62d6e8;
+  --gutter:22px; --maxw:1080px; --r:16px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;font-size:16.5px;line-height:1.62;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Space Grotesk','Inter',sans-serif;letter-spacing:-.02em;line-height:1.2;margin:0}
+code,pre,.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+code{background:rgba(255,255,255,.07);padding:1px 6px;border-radius:6px;font-size:.88em;overflow-wrap:anywhere}
+a{color:inherit}
+p{margin:0 0 14px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gutter)}
+
+/* progress + nav */
+#progress{position:fixed;top:0;left:0;height:3px;width:0;background:linear-gradient(90deg,var(--pink),var(--violet),var(--lime));z-index:60}
+nav.top{position:sticky;top:0;z-index:50;background:rgba(11,14,20,.86);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+.nav-in{max-width:var(--maxw);margin:0 auto;padding-inline:var(--gutter);display:flex;align-items:center;gap:18px;min-height:52px}
+.brand{font-family:'Space Grotesk',sans-serif;font-weight:700;white-space:nowrap;font-size:15px}
+.brand b{color:var(--pink)}
+.nav-links{display:flex;gap:4px;overflow-x:auto;min-width:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nav-links::-webkit-scrollbar{display:none}
+.nav-links a{white-space:nowrap;text-decoration:none;color:var(--muted);font-size:14px;padding:12px 10px;border-radius:10px;min-height:44px;display:inline-flex;align-items:center}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.nav-links a.active{color:var(--text);background:rgba(255,79,163,.14)}
+
+/* hero */
+.hero{padding-top:54px;padding-bottom:40px;position:relative;overflow:hidden}
+.hero::before{content:"";position:absolute;inset:-40% -20% auto auto;width:720px;height:720px;background:radial-gradient(circle,rgba(165,139,255,.18),transparent 60%);pointer-events:none}
+.hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:36px;align-items:center;position:relative}
+.eyebrow{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--lime);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+.hero h1{font-size:44px;font-weight:700}
+.hero h1 span{color:var(--pink)}
+.orig{color:var(--muted);margin-top:10px;font-size:15px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0 22px}
+.chip{font-size:13.5px;padding:6px 11px;border-radius:999px;background:var(--card);border:1px solid var(--line);color:var(--muted)}
+.thesis{border-left:3px solid var(--pink);padding:4px 0 4px 16px;font-size:18px;color:var(--text);margin:0 0 22px}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:12px;background:var(--pink);color:#160611;font-weight:700;text-decoration:none;transition:transform .15s,box-shadow .15s}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 24px rgba(255,79,163,.3)}
+.poster{position:relative;display:block;border-radius:var(--r);overflow:hidden;border:1px solid var(--line);aspect-ratio:16/9;background:#000}
+.poster img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s}
+.poster:hover img{transform:scale(1.03)}
+.poster .play{position:absolute;inset:0;display:grid;place-items:center}
+.poster .play i{width:68px;height:68px;border-radius:50%;background:rgba(255,79,163,.92);display:grid;place-items:center;box-shadow:0 10px 30px rgba(0,0,0,.5)}
+.poster .play i::after{content:"";border-left:20px solid #fff;border-top:12px solid transparent;border-bottom:12px solid transparent;margin-left:5px}
+
+/* sections */
+section{padding-top:76px;padding-bottom:52px;scroll-margin-top:70px;border-top:1px solid rgba(255,255,255,.06)}
+.shead{margin-bottom:24px}
+.shead .num{font-family:'JetBrains Mono',monospace;color:var(--pink);font-size:13px;letter-spacing:.08em}
+.shead h2{font-size:32px;margin-top:6px}
+.shead .sub{color:var(--muted);margin-top:8px}
+.tc{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--lime);text-decoration:none;border:1px solid rgba(200,240,81,.3);padding:2px 8px;border-radius:7px;white-space:nowrap;display:inline-block;min-height:24px}
+.tc:hover{background:rgba(200,240,81,.12)}
+h3{font-size:21px;margin:30px 0 12px}
+.lead{font-size:18px;color:var(--text)}
+
+/* tldr */
+.tldr{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;transition:border-color .2s,transform .2s}
+.card:hover{border-color:rgba(255,255,255,.18)}
+.card h4{font-size:17px;margin-bottom:8px}
+.card p:last-child{margin-bottom:0}
+.k{color:var(--lime);font-family:'JetBrains Mono',monospace;font-size:13px;display:block;margin-bottom:6px;letter-spacing:.04em}
+
+/* figure */
+figure.shot{margin:26px 0;background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+figure.shot img{display:block;width:auto;max-width:100%;height:auto;margin:0 auto;cursor:zoom-in}
+figure.shot figcaption{padding:14px 18px;color:var(--muted);font-size:15px;border-top:1px solid var(--line)}
+figure.shot figcaption b{color:var(--text)}
+.figmeta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:10px}
+.figbtn{font-size:14px;color:var(--text);text-decoration:none;background:rgba(255,255,255,.06);border:1px solid var(--line);padding:9px 12px;border-radius:10px;min-height:44px;display:inline-flex;align-items:center;gap:6px}
+.figbtn:hover{background:rgba(255,255,255,.12)}
+
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start}
+.diagram{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin:22px 0}
+.diagram svg{display:block;width:100%;height:auto;max-width:380px;margin:0 auto}
+.diagram .cap{color:var(--muted);font-size:14px;margin-top:10px;text-align:center}
+
+/* vibes strip */
+.strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:18px 0}
+.step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;position:relative}
+.step .d{font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--amber)}
+.step p{margin:6px 0 0;font-size:15.5px}
+.step.bad{border-color:rgba(255,79,163,.35)}
+
+/* types grid */
+.types{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:18px}
+.type .tag{display:inline-block;font-size:12.5px;font-family:'JetBrains Mono',monospace;padding:2px 8px;border-radius:6px;margin-bottom:8px}
+.tag.dev{background:rgba(165,139,255,.18);color:#d6caff}
+.tag.prod{background:rgba(255,255,255,.08);color:var(--muted)}
+.type.today{border-color:rgba(255,79,163,.5);background:linear-gradient(180deg,rgba(255,79,163,.08),var(--card))}
+
+/* vague vs concrete */
+.vc{display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:stretch;margin:20px 0}
+.vc .col{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+.vc .col.v li{color:var(--dim);text-decoration:line-through}
+.vc .col.c{border-color:rgba(200,240,81,.35)}
+.vc ul{margin:8px 0 0;padding-left:18px}
+.vc li{margin:4px 0}
+.vc .arrow{display:grid;place-items:center;color:var(--lime);font-size:28px}
+
+/* rubric */
+.rubric{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}
+.rubric .card .k{color:var(--muted)}
+.rubric .pass{border-color:rgba(200,240,81,.4)}
+.rubric .fail{border-color:rgba(255,79,163,.4)}
+.rubric ul{margin:0;padding-left:18px}
+
+/* lab steps */
+.lab{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0;counter-reset:s}
+.lab .item{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px 16px 56px;position:relative;counter-increment:s}
+.lab .item::before{content:counter(s);position:absolute;left:16px;top:14px;width:28px;height:28px;border-radius:8px;background:rgba(165,139,255,.2);color:#d6caff;font-family:'JetBrains Mono',monospace;font-size:14px;display:grid;place-items:center}
+.lab .item b{display:block;margin-bottom:2px}
+.lab .item span{color:var(--muted);font-size:15px}
+
+pre.prompt{background:#0d1219;border:1px solid var(--line);border-radius:14px;padding:16px 18px;white-space:pre-wrap;font-size:14px;line-height:1.6;color:#dfe7f2;margin:16px 0}
+.note{background:rgba(242,179,92,.08);border:1px solid rgba(242,179,92,.3);border-radius:14px;padding:14px 18px;color:var(--text);font-size:15.5px;margin:18px 0}
+
+/* quotes */
+.quotes{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.quote{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px 22px;margin:0}
+.quote .en{font-size:17px;color:var(--text);font-weight:500}
+.quote .ru{color:var(--muted);margin-top:8px;font-size:15.5px}
+.quote footer{margin-top:12px}
+
+/* actions */
+.actions{display:grid;gap:10px;counter-reset:a;margin:0;padding:0;list-style:none}
+.actions li{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 18px 14px 58px;position:relative;counter-increment:a}
+.actions li::before{content:counter(a,decimal-leading-zero);position:absolute;left:18px;top:14px;font-family:'JetBrains Mono',monospace;color:var(--pink);font-size:15px}
+
+/* timeline */
+.tl{position:relative;margin-top:10px}
+.tl::before{content:"";position:absolute;left:11px;top:6px;bottom:6px;width:2px;background:linear-gradient(var(--pink),var(--violet),var(--lime))}
+.tl-item{position:relative;padding:0 0 26px 40px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+.tl-item::before{content:"";position:absolute;left:4px;top:6px;width:16px;height:16px;border-radius:50%;background:var(--bg);border:3px solid var(--pink)}
+.tl-item h4{font-size:17px;margin:6px 0 4px}
+.tl-item p{margin:0;color:var(--muted);font-size:15.5px}
+.tl-thumb{width:168px;border-radius:10px;overflow:hidden;border:1px solid var(--line);cursor:zoom-in;background:#000;padding:0;display:block}
+.tl-thumb img{display:block;width:100%;height:auto}
+.tl-thumb:hover{border-color:var(--pink)}
+
+footer.end{padding-top:40px;padding-bottom:60px;border-top:1px solid var(--line);color:var(--dim);font-size:14px}
+footer.end{padding-inline:var(--gutter)} footer.end>div{max-width:var(--maxw);margin:0 auto}
+
+/* lightbox */
+#lb{position:fixed;inset:0;background:rgba(4,6,10,.94);display:none;z-index:100;align-items:center;justify-content:center;flex-direction:column;padding:20px}
+#lb.open{display:flex}
+#lb img{max-width:min(96vw,1470px);max-height:80vh;width:auto;height:auto;border-radius:10px;border:1px solid var(--line)}
+#lb .lb-bar{display:flex;gap:12px;align-items:center;margin-top:14px;flex-wrap:wrap;justify-content:center;max-width:960px}
+#lb .lb-cap{color:var(--muted);font-size:15px;text-align:center}
+#lb .close{position:absolute;top:14px;right:14px;width:44px;height:44px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:22px;cursor:pointer}
+
+/* reveal */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity .6s ease,transform .6s ease}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.reveal{opacity:1;transform:none;transition:none}html{scroll-behavior:auto}}
+
+@media (max-width:900px){
+  .hero-grid{grid-template-columns:1fr}
+  .two,.quotes,.tldr{grid-template-columns:1fr}
+  .rubric,.lab{grid-template-columns:1fr}
+  .strip{grid-template-columns:1fr 1fr}
+}
+@media (max-width:640px){
+  :root{--gutter:18px}
+  .hero{padding-top:24px;padding-bottom:24px}
+  .hero h1{font-size:31px}
+  section{padding-top:52px;padding-bottom:36px;scroll-margin-top:56px}
+  .shead{margin-bottom:20px}
+  .shead h2{font-size:24px}
+  .strip{grid-template-columns:1fr}
+  .vc{grid-template-columns:1fr}
+  .vc .arrow{transform:rotate(90deg);padding:2px 0}
+  .tl-item{grid-template-columns:1fr}
+  .tl-thumb{width:100%;max-width:320px}
+  .brand{display:none}
+}
+</style>
+
+<style data-visual-html-responsive="v1">
+:root {
+  --page-gutter: 22px;
+  --gutter: 22px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+}
+
+body {
+  overflow-x: visible !important;
+}
+
+.wrap,
+.nav-in,
+footer,
+[data-mobile-container] {
+  width: 100% !important;
+  margin-inline: auto;
+  padding-inline: var(--page-gutter) !important;
+}
+
+section {
+  scroll-margin-top: 70px;
+}
+
+.grid > *,
+.hero-grid > *,
+.split > *,
+.quotes > *,
+.checks > *,
+.facts > *,
+.tools > *,
+.debate > *,
+.nav-links,
+.navlinks,
+.shead > *,
+.sec-head > *,
+.tl-item,
+.timeline > *,
+[data-mobile-stack] > * {
+  min-width: 0;
+}
+
+img,
+video,
+audio,
+canvas,
+iframe,
+figure {
+  max-width: 100% !important;
+}
+
+img,
+video,
+canvas {
+  height: auto;
+}
+
+video,
+audio,
+iframe {
+  display: block;
+  width: 100% !important;
+}
+
+iframe {
+  height: auto !important;
+  aspect-ratio: 16 / 9;
+  border: 0;
+}
+
+svg {
+  max-width: 100%;
+}
+
+pre,
+table,
+.tbl,
+[data-mobile-scroll] {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+table,
+.tbl {
+  display: block;
+}
+
+[data-mobile-scroll] > svg {
+  width: 640px !important;
+  min-width: 640px !important;
+  max-width: none !important;
+  height: auto;
+}
+
+.k,
+.srcline,
+.srcline code,
+.eyebrow,
+.chip,
+.pill,
+.tag,
+.au,
+.src,
+.tc,
+.t,
+.timecode,
+.trick-head h3,
+.item-head h3,
+.check .txt,
+.talk p,
+.trick p,
+.trick li,
+.item p,
+.item li,
+.card p,
+.card li,
+.quote .q,
+.quote .ru,
+blockquote .ru,
+.tl-item p,
+.timeline p,
+.deb li,
+.callout,
+.fact .d,
+.tool .desc,
+[data-mobile-copy],
+[data-mobile-copy] p,
+[data-mobile-copy] li,
+[data-mobile-copy] dd,
+[data-mobile-wrap],
+code:not(pre code),
+h1,
+h2,
+h3,
+h4 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.eyebrow,
+.chip,
+.pill,
+.tag,
+.au,
+.src,
+.links .src {
+  max-width: 100%;
+}
+
+.src,
+.links .src {
+  white-space: normal !important;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-gutter: 18px;
+    --gutter: 18px;
+    --radius: 14px;
+  }
+
+  .nav-in,
+  nav .wrap {
+    min-height: 60px;
+    height: auto !important;
+    gap: 8px !important;
+    padding-block: 8px !important;
+  }
+
+  .brand,
+  .navbrand {
+    display: none !important;
+  }
+
+  .nav-links,
+  .navlinks {
+    width: 100%;
+    margin-left: 0 !important;
+    padding-bottom: 2px;
+    justify-content: space-between;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  .nav-links::-webkit-scrollbar,
+  .navlinks::-webkit-scrollbar {
+    display: block;
+    height: 2px;
+  }
+
+  nav a,
+  a.src,
+  a.tc,
+  a.t,
+  a.timecode,
+  a.btn,
+  button,
+  [role="button"],
+  .lbbtn,
+  #lb .close,
+  .lightbox .close,
+  [data-seek] {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  nav a,
+  a.src,
+  a.tc,
+  a.t,
+  a.timecode,
+  a.btn,
+  button,
+  [role="button"],
+  .lbbtn,
+  #lb .close,
+  .lightbox .close,
+  a[data-seek],
+  button[data-seek],
+  span[data-seek] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .nav-links a,
+  .navlinks a {
+    flex: 0 0 auto;
+    padding: 9px 8px !important;
+  }
+
+  section {
+    padding-block: 52px 36px !important;
+    scroll-margin-top: 56px !important;
+  }
+
+  header.hero,
+  .hero {
+    padding-block: 24px 24px !important;
+  }
+
+  .hero h1 {
+    font-size: clamp(30px, 8vw, 36px) !important;
+    line-height: 1.1;
+    margin-top: 18px;
+  }
+
+  .g2,
+  .g3,
+  .g4,
+  .grid:not(.g2):not(.g3):not(.g4),
+  .hero-grid,
+  .split,
+  .quotes,
+  .checks,
+  .facts,
+  .tools,
+  .debate,
+  [data-mobile-stack="grid"] {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  [data-mobile-stack="flex"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+
+  .canvas:not([data-mobile-diagram="reflow"]),
+  figure:not([data-mobile-diagram="reflow"]):has(> svg[viewBox]) {
+    max-width: 100%;
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .canvas:not([data-mobile-diagram="reflow"]) > svg[viewBox]:not([data-mobile-diagram="reflow"]),
+  figure:not([data-mobile-diagram="reflow"]) > svg[viewBox]:not([data-mobile-diagram="reflow"]) {
+    width: 640px !important;
+    min-width: 640px !important;
+    max-width: none !important;
+    height: auto;
+  }
+
+  .talk,
+  .trick,
+  .item,
+  .card,
+  .quote,
+  .fact,
+  .check:not(ul),
+  .check > li,
+  .deb,
+  .thesis,
+  .thesis-card,
+  blockquote,
+  .callout,
+  [data-mobile-card] {
+    padding: 20px 18px !important;
+  }
+
+  blockquote {
+    margin-inline: 0 !important;
+  }
+
+  .trick-head,
+  .item-head,
+  .shead,
+  .sec-head,
+  .code .bar,
+  .tl-head,
+  blockquote footer {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .shead,
+  .sec-head {
+    align-items: flex-start;
+    margin-bottom: 20px !important;
+  }
+
+  .shead h2,
+  .sec-head h2 {
+    font-size: 24px !important;
+  }
+
+  .shead .src,
+  .sec-head .src {
+    margin-left: 0 !important;
+  }
+
+  .trick-head .tnum,
+  .item-head .tnum {
+    min-width: 38px;
+    height: 38px;
+    font-size: 19px;
+  }
+
+  .trick-head h3,
+  .item-head h3 {
+    padding-top: 4px;
+    font-size: 20px;
+  }
+
+  .who {
+    padding-left: 0;
+  }
+
+  .about,
+  .key,
+  .try,
+  .risk {
+    padding: 15px 16px;
+  }
+
+  .hero .sub,
+  .hero .lede,
+  .hero .lead,
+  .lead,
+  .lede,
+  .sec-sub,
+  .talk p,
+  .trick p,
+  .trick li,
+  .item p,
+  .item li,
+  .card p,
+  .card li,
+  .quote .q,
+  .quote .ru,
+  blockquote .ru,
+  .tl-item p,
+  .timeline p,
+  .check .txt,
+  .check > li,
+  .deb li,
+  .callout,
+  .fact .d,
+  .tool .desc,
+  .watch-item p,
+  [data-mobile-copy],
+  [data-mobile-copy] p,
+  [data-mobile-copy] li,
+  [data-mobile-copy] dd {
+    font-size: 16px !important;
+  }
+
+  .fact {
+    align-items: flex-start;
+  }
+
+  .fact .v {
+    min-width: 0 !important;
+  }
+
+  .tl {
+    padding-left: 24px;
+  }
+
+  .tl-thumbs .shot {
+    width: 100% !important;
+  }
+
+  .links {
+    align-items: stretch;
+  }
+
+  .links .src {
+    min-height: 44px;
+    padding: 9px 11px;
+  }
+
+  .check:not(ul) {
+    flex-wrap: wrap;
+  }
+
+  .check .txt {
+    flex: 1 1 220px;
+  }
+
+  #lb,
+  .lightbox {
+    padding: 16px !important;
+  }
+
+  footer {
+    padding-block: 36px 60px !important;
+  }
+}
+</style>
+</head>
+<body>
+<div id="progress"></div>
+<nav class="top">
+  <div class="nav-in">
+    <div class="brand">First <b>AI eval</b></div>
+    <div class="nav-links">
+      <a href="#tldr">TL;DR</a>
+      <a href="#why">Зачем evals</a>
+      <a href="#types">Типы</a>
+      <a href="#traces">Трейсы</a>
+      <a href="#good">«Хорошо»</a>
+      <a href="#criteria">Критерии</a>
+      <a href="#judge">LLM-судья</a>
+      <a href="#next">Что дальше</a>
+      <a href="#timeline">Таймлайн</a>
+      <a href="#quotes">Цитаты</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow">AI Engineer NYC · воркшоп · 12 октября 2026</div>
+        <h1>Как написать первый <span>AI eval</span></h1>
+        <div class="orig">How to Write Your First AI Eval — SallyAnn DeLucia, head of product в Arize AI</div>
+        <div class="chips">
+          <span class="chip">35:19</span>
+          <span class="chip">YouTube · AI Engineer</span>
+          <span class="chip">SallyAnn DeLucia</span>
+          <span class="chip">14 482 просмотра</span>
+          <span class="chip">LLM as a judge</span>
+        </div>
+        <p class="thesis">Трейсы — это логи для AI, а evals — настоящие тесты. Чтобы оценивать агента, сначала опишите, что для него значит «хорошо», в виде конкретных правил pass/fail, а потом превратите их в промпт для LLM-судьи.</p>
+        <a class="btn" href="https://www.youtube.com/watch?v=gv4w23xYj-0" target="_blank" rel="noopener">▶ Смотреть на YouTube</a>
+      </div>
+      <a class="poster" href="https://www.youtube.com/watch?v=gv4w23xYj-0" target="_blank" rel="noopener" aria-label="Открыть видео на YouTube">
+        <img src="thumbnail.jpg" alt="Постер видео How to Write Your First AI Eval">
+        <span class="play"><i></i></span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main>
+<section id="tldr">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">00 · TL;DR</div><h2>Коротко</h2></div>
+    <div class="tldr">
+      <div class="card reveal"><span class="k">ПРОБЛЕМА</span><h4>Оценка «на глаз» не масштабируется</h4><p>Без evals нельзя поймать регрессию после правки промпта, честно сравнить промпты и модели или поставить quality gate в CI.</p></div>
+      <div class="card reveal"><span class="k">ОТЛИЧИЕ ОТ ТЕСТА</span><h4>У агента много правильных ответов</h4><p>Unit-тест сверяет один вход с одним выходом. Логику агента в коде не прочитать: она проявляется только в трейсах.</p></div>
+      <div class="card reveal"><span class="k">РЕЦЕПТ</span><h4>Конкретные критерии, одно качество на eval</h4><p>Вместо «полезный, точный ответ» пишем проверяемые условия. LLM-судья надёжнее работает с одним критерием за раз.</p></div>
+      <div class="card reveal"><span class="k">ПРАКТИКА</span><h4>Трейсы → датасет → playground → evaluator</h4><p>Отфильтровать нужные спаны, сохранить их в датасет, написать шаблон судьи, прогнать, читать объяснения и править промпт.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">01 · 02:06–05:15</div><h2>Почему проверки «на глаз» не работают</h2><p class="sub">Главы «Why vibe checks don't scale», «Is an eval just a unit test?», «Why agents make evals harder»</p></div>
+    <p class="reveal">DeLucia описывает «vibes problem» <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=126s" target="_blank" rel="noopener">02:06</a>: команда меняет промпт, ответы кажутся лучше, и никто не может это доказать.</p>
+    <div class="strip reveal" data-mobile-stack="grid">
+      <div class="step"><span class="d">ПОНЕДЕЛЬНИК</span><p>Правка в промпте, релиз. В целом стало лучше, но проверить нечем.</p></div>
+      <div class="step"><span class="d">ВТОРНИК</span><p>Ещё один релиз, ответы по-прежнему выглядят нормально.</p></div>
+      <div class="step bad"><span class="d">ЧЕРЕЗ НЕДЕЛЮ</span><p>Сценарий, который чинили, снова сломан.</p></div>
+      <div class="step bad"><span class="d">ДАЛЬШЕ</span><p>Проблема растёт, а доказать, что исправлено или сломано, невозможно.</p></div>
+    </div>
+    <p class="reveal">Без evals недоступны четыре вещи: поймать регрессию после изменения промпта, объективно сравнить промпты и версии моделей, понять, лучше ли новая модель именно для вашего сценария, и поставить формальный quality gate в CI перед выкаткой агента.</p>
+
+    <h3 class="reveal">Eval — не unit-тест <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=188s" target="_blank" rel="noopener">03:08</a></h3>
+    <p class="reveal">В обычном тесте один вход и один правильный выход, а логику можно прочитать в коде. У агента логика проявляется уже после выполнения, в виде трейсов, а правильных ответов много. Поэтому оценка проверяет сразу несколько свойств: есть ли план по дням, укладывается ли бюджет и так далее.</p>
+    <figure class="shot reveal">
+      <img src="frames/f-0313-slide.png" data-full="frames/f-0313-slide.png" data-t="193" data-cap="Software tests vs. AI evals: один assert против трёх ответов на запрос «Plan 3 days in Lisbon under $1,200»" alt="Слайд Software tests vs. AI evals" width="1470" height="828" loading="lazy">
+      <figcaption><b>Software test против AI eval.</b> Слева <code>assert total(cart) == 42.00</code>: один вход, один правильный выход. Справа три ответа на запрос «Plan 3 days in Lisbon under $1,200»: план по дням на $1 050 проходит, разбивка бюджета без маршрута падает (no plan), отличный план на 5 дней за $1 400 тоже падает (over budget). Вывод слайда: правильных ответов много, поэтому «хорошо» нужно определить самому.
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=193s" target="_blank" rel="noopener">▶ Смотреть момент 03:13</a></div>
+      </figcaption>
+    </figure>
+    <p class="reveal">Формула, которую DeLucia повторяет на воркшопе: трейсы — это логи для AI, evals — настоящие тесты <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=241s" target="_blank" rel="noopener">04:01</a>. Отсюда неприятное следствие: без трейсинга и observability писать evals не получится.</p>
+
+    <h3 class="reveal">Почему с агентами сложнее <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=253s" target="_blank" rel="noopener">04:13</a></h3>
+    <p class="reveal">Один вызов LLM даёт один спан: вход и выход. Агент порождает дерево из под-агентов, инструментов и вызовов модели. Ошибки каскадом идут по дереву, а плохой итоговый ответ часто выглядит гладко. Один unit-тест такую конструкцию не покроет.</p>
+    <figure class="shot reveal">
+      <img src="frames/f-0413-slide.png" data-full="frames/f-0413-slide.png" data-t="253" data-cap="Why agents make this harder: дерево спанов TripAgentGraph с типами, задержками и таймлайном" alt="Слайд Why agents make this harder с деревом трейса" width="1470" height="828" loading="lazy">
+      <figcaption><b>Трейс travel-агента.</b> Корень <code>TripAgentGraph</code> (9,7 с, на нём висят 3 evals) вызывает <code>research_agent</code> с LLM и инструментами <code>essential_info</code> и <code>weather_brief</code>, <code>local_agent</code> с <code>VectorStoreRetriever</code> и инструментом <code>local_flavor</code>, затем <code>budget_agent</code>. Колонка KIND показывает тип каждого спана (agent, llm, tool, retriever), таймлайн показывает, где уходит время. Подпись слева: «Errors cascade — and bad answers often look polished».
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=253s" target="_blank" rel="noopener">▶ Смотреть момент 04:13</a></div>
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="types">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">02 · 05:15–07:29</div><h2>Какие бывают evals</h2><p class="sub">Сегодня в фокусе LLM as a judge, но это лишь один из семи видов</p></div>
+    <figure class="shot reveal">
+      <img src="frames/f-0515-slide.png" data-full="frames/f-0515-slide.png" data-t="315" data-cap="Types of evals: семь видов оценок и где их применять, в разработке или в продакшене" alt="Слайд Types of evals" width="1470" height="828" loading="lazy">
+      <figcaption><b>Семь видов evals.</b> Фиолетовая полоса DEVELOPMENT покрывает первые четыре вида плюс agent-as-a-judge, чёрная полоса PRODUCTION тянется через все колонки: пользовательская обратная связь и бизнес-метрики появляются только в продакшене.
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=315s" target="_blank" rel="noopener">▶ Смотреть момент 05:15</a></div>
+      </figcaption>
+    </figure>
+    <div class="types">
+      <div class="card type today reveal"><span class="tag dev">dev + prod</span><h4>LLM as a judge</h4><p>Вторая LLM оценивает один аспект агента по вашей рубрике: QA, summarization, relevance. Возвращает метку и объяснение. Объяснение показывает, почему поставлена метка, и избавляет от необходимости верить ей на слово.</p></div>
+      <div class="card type reveal"><span class="tag dev">dev + prod</span><h4>Decision models</h4><p>Дешёвые и быстрые: вопрос на входе, вероятность и метку (true/false или класс) на выходе, обычно без объяснения. По словам DeLucia, OpenAI за неделю до воркшопа выпустила API для таких моделей <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=352s" target="_blank" rel="noopener">05:52</a>, и она ждёт, что они займут большое место в evals.</p></div>
+      <div class="card type reveal"><span class="tag dev">dev + prod</span><h4>Code / logic</h4><p>Детерминированные проверки: есть ли слово в ответе, валиден ли JSON, регулярки, валидация структуры. Сюда же относятся ROUGE и BLEU.</p></div>
+      <div class="card type reveal"><span class="tag dev">dev + prod</span><h4>Annotations</h4><p>Golden datasets с эталонными метками, оценками и заметками. Бывают и синтетическими.</p></div>
+      <div class="card type reveal"><span class="tag dev">dev + prod</span><h4>Agent as a judge</h4><p>Появился примерно за последние полгода: полноценный агент, который может пользоваться skills, оценивает другого агента. Подходит для очень сложных критериев успеха.</p></div>
+      <div class="card type reveal"><span class="tag prod">prod</span><h4>User feedback</h4><p>Лайк или дизлайк, принял пользователь ответ или отклонил.</p></div>
+      <div class="card type reveal"><span class="tag prod">prod</span><h4>Business metrics</h4><p>Передача диалога человеку, разговоры, оборванные раньше времени, adoption, CTR.</p></div>
+    </div>
+    <p class="reveal" style="margin-top:18px">Первые четыре вида работают на всём жизненном цикле, от разработки до продакшена. DeLucia считает это важным: evals должны расти вместе с продуктом, а не выбрасываться после этапа разработки.</p>
+  </div>
+</section>
+
+<section id="traces">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">03 · 07:29–19:03</div><h2>Сначала посмотрите на данные</h2><p class="sub">Подготовка воркшопа, travel-агент и чтение трейса</p></div>
+    <p class="reveal">Практическая часть идёт в Arize AX. Участники заходят на <code>app.arize.com</code> <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=468s" target="_blank" rel="noopener">07:48</a>, заводят бесплатный аккаунт и в Settings → AI Providers добавляют API-ключ любого провайдера: Anthropic, OpenAI, Gemini или собственный endpoint. Ключ стоит проверить кнопкой test integration. Демо-проект лежит в разделе Traces.</p>
+
+    <h3 class="reveal">Сценарий: агент, планирующий поездки <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=616s" target="_blank" rel="noopener">10:16</a></h3>
+    <p class="reveal">Агент получает запрос на поездку и уточняющий вопрос пользователя, вызывает инструменты и возвращает план. В запросе есть направление, длительность, бюджет и стиль путешествия; пример со слайда: Marrakech на неделю, $1500, стиль authentic, вопрос «Explain what etiquette and local customs I need to know». В продуктовых терминах «хорошо» значит две вещи: агент отвечает на тот вопрос, который задал пользователь, и соблюдает число дней и бюджет.</p>
+    <p class="reveal">В демо DeLucia открывает трейс про Прагу <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=690s" target="_blank" rel="noopener">11:30</a>: 3 дня, бюджет $800, просьба о чём-то «более местном и менее туристическом». Задание для зала: пройтись по трейсам и ответить на три вопроса. О чём просит пользователь? Что сделал агент, какие инструменты вызвал и что ответил? Отправили бы вы такой ответ пользователю?</p>
+
+    <h3 class="reveal">Как читать трейс <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=860s" target="_blank" rel="noopener">14:20</a></h3>
+    <div class="two">
+      <div class="reveal">
+        <p>Трейс — это все шаги, которые агент сделал, чтобы ответить на вопрос. Наверху лежит root span; формально это спан с <code>parent ID = null</code>, перед ним ничего нет. Обычно в нём находятся вход и финальный ответ.</p>
+        <p>Каждый спан ниже — единица работы. Иконка показывает тип: agent, tool (сходить за внешними данными вроде погоды или достопримечательностей), LLM. В демо root span вызывает <code>research_agent</code>: это multi-agent-система, где несколько агентов выполняют разные задачи по поручению главного.</p>
+        <p>Вопрос из зала: почему подряд два LLM-спана <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=990s" target="_blank" rel="noopener">16:30</a>? Первый вызов LLM выбрал инструмент, второй получил данные инструмента (температуру, сведения о направлении) и сжал их для следующих шагов. Иногда, чтобы понять шаг, приходится спуститься по дереву и вернуться наверх.</p>
+      </div>
+      <div class="diagram reveal" data-mobile-diagram="reflow">
+        <svg viewBox="0 0 400 470" role="img" aria-label="Схема: LLM выбирает инструмент, инструмент возвращает данные, вторая LLM их суммирует" data-mobile-diagram="reflow">
+          <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#8a98ad"/></marker></defs>
+          <rect x="20" y="10" width="360" height="70" rx="14" fill="#1a2230" stroke="#a58bff" stroke-width="2"/>
+          <text x="40" y="38" fill="#d6caff" font-family="JetBrains Mono,monospace" font-size="15">agent</text>
+          <text x="40" y="64" fill="#eef2f8" font-family="Inter,sans-serif" font-size="19" font-weight="600">research_agent</text>
+          <line x1="200" y1="80" x2="200" y2="118" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar)"/>
+          <rect x="20" y="122" width="360" height="80" rx="14" fill="#1a2230" stroke="#ff4fa3" stroke-width="2"/>
+          <text x="40" y="150" fill="#ffb3d6" font-family="JetBrains Mono,monospace" font-size="15">llm #1</text>
+          <text x="40" y="180" fill="#eef2f8" font-family="Inter,sans-serif" font-size="18">выбирает инструмент</text>
+          <line x1="200" y1="202" x2="200" y2="240" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar)"/>
+          <rect x="20" y="244" width="360" height="80" rx="14" fill="#1a2230" stroke="#f2b35c" stroke-width="2"/>
+          <text x="40" y="272" fill="#f2c98a" font-family="JetBrains Mono,monospace" font-size="15">tool · essential_info</text>
+          <text x="40" y="302" fill="#eef2f8" font-family="Inter,sans-serif" font-size="18">приносит погоду и данные</text>
+          <line x1="200" y1="324" x2="200" y2="362" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar)"/>
+          <rect x="20" y="366" width="360" height="90" rx="14" fill="#1a2230" stroke="#ff4fa3" stroke-width="2"/>
+          <text x="40" y="394" fill="#ffb3d6" font-family="JetBrains Mono,monospace" font-size="15">llm #2</text>
+          <text x="40" y="424" fill="#eef2f8" font-family="Inter,sans-serif" font-size="18">суммирует результат</text>
+          <text x="40" y="446" fill="#b6c2d2" font-family="Inter,sans-serif" font-size="15">для следующих шагов</text>
+        </svg>
+        <div class="cap">Схема конспекта: откуда в трейсе два LLM-спана подряд</div>
+      </div>
+    </div>
+    <figure class="shot reveal">
+      <img src="frames/f-1629-slide.png" data-full="frames/f-1629-slide.png" data-t="989" data-cap="Трейс в Arize: дерево спанов слева, итоговый маршрут по дням справа" alt="Интерфейс Arize с деревом спанов и выводом агента" width="1470" height="828" loading="lazy">
+      <figcaption><b>Тот же трейс в Arize.</b> Слева дерево: <code>research_agent</code> → <code>essential_info</code> и два вызова ChatOpenAI, <code>local_agent</code> с <code>VectorStoreRetriever</code>, инструменты <code>local_flavor</code>, <code>local_customs</code>, <code>hidden_gems</code>, дальше <code>budget_agent</code>. У каждого спана видно время и число токенов. Справа вкладка Input / Output корневого спана с маршрутом по Токио на шесть дней. Это материал, по которому потом пишут критерии.
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=989s" target="_blank" rel="noopener">▶ Смотреть момент 16:29</a></div>
+      </figcaption>
+    </figure>
+    <p class="reveal">Ещё два ответа из Q&amp;A. Корневой узел не обязан принимать все решения: бывают архитектуры с supervisor- или orchestrator-агентом, который планирует работу под-агентов, а бывают модульные агенты без супервизора, как в демо. Arize не привязан к фреймворку: auto-instrumenters поставляются в пакете трейсинга OpenInference <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1105s" target="_blank" rel="noopener">18:25</a>.</p>
+  </div>
+</section>
+
+<section id="good">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">04 · 19:03–22:02</div><h2>Определите, что значит «хорошо»</h2><p class="sub">Первый шаг любого eval — конкретные критерии вместо оценочных слов</p></div>
+    <p class="reveal">Людям трудно сформулировать успех, поэтому DeLucia предлагает простой приём <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1160s" target="_blank" rel="noopener">19:20</a>: выписать, что значит «хорошо», и заменить каждое расплывчатое слово проверяемым условием.</p>
+    <div class="vc reveal" data-mobile-stack="grid">
+      <div class="col v"><span class="k" style="color:var(--dim)">РАСПЛЫВЧАТО</span><ul><li>Helpful</li><li>Accurate</li><li>Good response</li></ul></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="col c"><span class="k">КОНКРЕТНО</span><ul><li>Отвечает на уточняющий вопрос пользователя</li><li>Совпадает с запрошенным числом дней</li><li>Укладывает итоговую сумму в заявленный бюджет</li></ul></div>
+    </div>
+    <h3 class="reveal">Одно качество на один eval</h3>
+    <p class="reveal">По словам DeLucia, многие исследования показывают, что LLM as a judge хорошо справляется только с одним критерием за раз <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1197s" target="_blank" rel="noopener">19:57</a>. Исключения — decision models и agent as a judge: им можно дать несколько критериев. На слайде это показано как ряд отдельных качеств: groundedness, actionability, tone, instruction-following. Выберите одно, остальные добавите позже.</p>
+    <h3 class="reveal">Evals растут итерациями</h3>
+    <p class="reveal">Набор evals нельзя настроить один раз и забыть. Первая версия evals для Alyx, AI-агента внутри Arize, была простой: QA correctness, user frustration и проверки безопасности вроде jailbreak и toxicity. Сейчас на Alyx работают 32 evals <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1255s" target="_blank" rel="noopener">20:55</a>. Новые появлялись по мере того, как реальные данные из продакшена показывали, чего ещё не хватает для определения успеха.</p>
+    <p class="reveal">Что лучше, универсальный eval или специфичный <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1275s" target="_blank" rel="noopener">21:15</a>? Специфичный под ваш сценарий обычно точнее, но любой eval лучше, чем никакого. В eval hub Arize есть готовые шаблоны (QA correctness, hallucination, session coherence), с них удобно стартовать, а затем подгонять под свой случай.</p>
+  </div>
+</section>
+
+<section id="criteria">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">05 · 22:02–25:19</div><h2>Критерии pass/fail</h2><p class="sub">Шесть пунктов, из которых потом собирается промпт судьи</p></div>
+    <p class="reveal">Участники в парах выписывают шесть вещей <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1330s" target="_blank" rel="noopener">22:10</a>: задачу, на которой строится eval; как выглядит успех; как выглядит провал; что именно оценивает eval; три пункта для pass; три пункта для fail. Чем конкретнее, тем лучше получится судья.</p>
+    <div class="rubric">
+      <div class="card reveal"><span class="k">TASK · SUCCESS · FAILURE</span><ul><li><b>Task:</b> пользователь задаёт уточняющий вопрос о поездке</li><li><b>Success:</b> отвечает на него напрямую, опираясь на детали поездки</li><li><b>Failure:</b> скатывается в типовую разбивку бюджета</li></ul></div>
+      <div class="card pass reveal"><span class="k" style="color:var(--lime)">PASS, ЕСЛИ</span><ul><li>ответ на вопрос стоит в первых строках</li><li>соблюдены заданные дни и бюджет</li><li>лишние детали краткие или их нет</li></ul></div>
+      <div class="card fail reveal"><span class="k" style="color:var(--pink)">FAIL, ЕСЛИ</span><ul><li>начинает с разбивки бюджета, о которой не просили</li><li>противоречит запрошенным дням или бюджету</li><li>так и не отвечает на вопрос</li></ul></div>
+    </div>
+    <figure class="shot reveal">
+      <img src="frames/f-2417-slide.png" data-full="frames/f-2417-slide.png" data-t="1457" data-cap="Example: travel agent follow-ups — рубрика для eval по instruction-following" alt="Слайд с примером критериев pass и fail" width="1470" height="828" loading="lazy">
+      <figcaption><b>Рубрика на слайде.</b> Метка в углу «Judging: instruction-following» фиксирует единственное качество, которое проверяет этот eval. Карточки выше пересказывают слайд по-русски.
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1457s" target="_blank" rel="noopener">▶ Смотреть момент 24:17</a></div>
+      </figcaption>
+    </figure>
+    <p class="reveal">Зачем пункты, если хватило бы одной строки <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1470s" target="_blank" rel="noopener">24:30</a>? Из них пишется промпт для LLM as a judge, и модели нужна конкретика. DeLucia советует писать критерии так, будто объясняете коллеге или стейкхолдеру, как выглядит успех.</p>
+    <div class="note reveal">Вопрос из зала <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1380s" target="_blank" rel="noopener">23:00</a>: подробные атрибуты запроса в трейсе появляются сами? Частично. Готовая инструментация отправляет стандартные атрибуты, например input value и сообщения для LLM. Для своих полей есть ручная или гибридная инструментация. Для собственных приложений DeLucia советует подключить skills Arize и поручить расстановку инструментации своему coding-агенту, а потом подправить результат.</div>
+  </div>
+</section>
+
+<section id="judge">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">06 · 25:19–32:08</div><h2>Датасет и LLM-судья в playground</h2><p class="sub">Шесть шагов первой самостоятельной итерации</p></div>
+    <ol class="lab" data-mobile-stack="grid" style="list-style:none;padding:0">
+      <li class="item reveal"><b>Отфильтровать спаны</b><span>В Traces найти спаны, которые будете оценивать</span></li>
+      <li class="item reveal"><b>Выбрать релевантные</b><span>Отметить спаны, подходящие под критерии</span></li>
+      <li class="item reveal"><b>Сохранить в датасет</b><span>Add to Dataset → новый датасет</span></li>
+      <li class="item reveal"><b>Открыть Playground</b><span>Новый prompt playground</span></li>
+      <li class="item reveal"><b>Add evaluator → New</b><span>Записать критерии в шаблон</span></li>
+      <li class="item reveal"><b>Загрузить и запустить</b><span>Датасет, маппинг <code>{input}</code>/<code>{output}</code>, run</span></li>
+    </ol>
+    <p class="reveal" style="color:var(--muted);font-size:15px">Шаги перенесены со слайда «Lab: take a first pass» <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1645s" target="_blank" rel="noopener">27:25</a>; имя eval там предлагают задавать как <code>workshop-[name]-[quality]</code>.</p>
+
+    <h3 class="reveal">Какие спаны брать <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1525s" target="_blank" rel="noopener">25:25</a></h3>
+    <p class="reveal">Всё зависит от того, что вы оцениваете. Сравнить запрос с итоговым маршрутом? Сохраняйте root spans, фильтр <code>parent ID = null</code>. Проверить, что инструмент вернул нужные данные? Берите спаны этого инструмента, фильтр по имени. Фильтры DeLucia называет лучшим способом найти нужные данные.</p>
+    <figure class="shot reveal">
+      <img src="frames/f-2654-slide.png" data-full="frames/f-2654-slide.png" data-t="1614" data-cap="Вкладка Spans в Arize: фильтр name = 'essential_info', выбрано 26 спанов, кнопка Add to Dataset" alt="Интерфейс Arize: фильтр спанов и добавление в датасет" width="1470" height="828" loading="lazy">
+      <figcaption><b>Фильтр по инструменту.</b> На вкладке Spans стоит фильтр <code>name = 'essential_info'</code>: 26 спанов типа TOOL, вход вроде <code>{'destination': 'Prague'}</code>, выход с описанием климата. Все 26 отмечены, внизу кнопки Send to Labeling Queue и Add to Dataset.
+        <div class="figmeta"><a class="figbtn" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1614s" target="_blank" rel="noopener">▶ Смотреть момент 26:54</a></div>
+      </figcaption>
+    </figure>
+
+    <h3 class="reveal">Шаблон судьи <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1655s" target="_blank" rel="noopener">27:35</a></h3>
+    <p class="reveal">В Arize два playground: prompt playground для промптов, в том числе eval-промптов, и agent playground для сквозного тестирования агента. Нужен первый. Готовый eval из eval hub добавляется из выпадающего списка; если начинаете с нуля, выбирайте blank eval и пишите шаблон из своих критериев. Многое просто вставляется из заметок.</p>
+    <div class="two">
+      <div class="reveal">
+        <p>Порядок частей шаблона у DeLucia:</p>
+        <ol style="padding-left:20px;margin:0 0 14px">
+          <li>Роль и задача. Например: «You're evaluating whether an assistant's output actually accurately captures the details requested or provided in the input».</li>
+          <li>Данные. Имена переменных можно не подгонять: variable mapping <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1765s" target="_blank" rel="noopener">29:25</a> связывает их с атрибутами трейса. Если в датасете поле называется иначе, меняется задача, а не каждый eval.</li>
+          <li>Пункты pass и fail. Пример: correct, только если ответ согласуется со входом; incorrect при неверном направлении, типе жилья и т. п.</li>
+        </ol>
+      </div>
+      <div class="reveal">
+        <p>В параметрах задаются:</p>
+        <ul style="padding-left:20px;margin:0 0 14px">
+          <li><b>Метки.</b> Обычно correct/incorrect, но можно и больше: partially correct, not applicable. В Alyx ей важно видеть «частично верно».</li>
+          <li><b>Optimization direction.</b> Что считать хорошим результатом: метку correct или более низкий балл.</li>
+          <li><b>Объяснения.</b> Обоснование, почему судья поставил метку.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="reveal">Дальше загружается датасет, входы и выходы сопоставляются с переменными, и судья запускается. В демо DeLucia берёт GPT-4.1 mini <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1870s" target="_blank" rel="noopener">31:10</a>. Результаты появляются прямо в playground: читаете ответы судьи, отмечаете, где не согласны, правите промпт и запускаете снова. Готовый шаблон сохраняется кнопкой Save evaluator и становится доступен во всей платформе.</p>
+    <p class="reveal">Слайд о главном моменте итерации <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1953s" target="_blank" rel="noopener">32:33</a>: прочитайте вслух одно объяснение к провалу и спросите себя, ошибся судья или рубрика неясна.</p>
+    <h3 class="reveal">Итерации с Alyx <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1932s" target="_blank" rel="noopener">32:12</a></h3>
+    <p class="reveal">После первой ручной итерации можно подключить Alyx, агента Arize: он сам запускает playground, смотрит результаты, правит промпт и повторяет цикл. Критерии при этом остаются за вами. Промпт со слайда:</p>
+    <pre class="prompt" data-mobile-scroll>Here's my instruction-following eval for the travel agent.
+Review it against the explanations on my dataset.
+Where is the rubric vague or the judge disagreeing with me?
+Suggest one change and re-run it.</pre>
+  </div>
+</section>
+
+<section id="next">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">07 · 32:08–35:19</div><h2>Что делать после первого судьи</h2><p class="sub">Остальная часть цикла: выравнивание, онлайн-оценка, мониторинг</p></div>
+    <div class="two">
+      <div class="reveal">
+        <p>На воркшопе разобрали второй шаг цикла: инструментацию и написание eval. Дальше, по словам DeLucia, хорошие команды делают три вещи <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1987s" target="_blank" rel="noopener">33:07</a>.</p>
+        <p><b>Alignment.</b> Разметить примеры из датасета вручную, прогнать судью и проверить, совпадает ли он с людьми. Повторять, пока не начнёт совпадать.</p>
+        <p><b>Online evals.</b> Поставить судью на продакшен-трафик: каждый новый трейс автоматически оценивается всеми вашими evals. Слайд уточняет: начните с выборки, не оценивайте 100% трафика в первый же день.</p>
+        <p><b>Monitor.</b> Следить за долей pass и получать алерт при её падении.</p>
+        <p>Результаты evals становятся сигналом для управляемых агентов Arize. Один из них, Signal <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1970s" target="_blank" rel="noopener">32:50</a>, смотрит трейсы, находит проблемы и даже вносит исправления.</p>
+      </div>
+      <div class="diagram reveal" data-mobile-diagram="reflow">
+        <svg viewBox="0 0 420 420" role="img" aria-label="Цикл evals: инструментация, eval, alignment, online evals, мониторинг" data-mobile-diagram="reflow">
+          <defs><marker id="ar2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#8a98ad"/></marker></defs>
+          <circle cx="210" cy="210" r="140" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="2" stroke-dasharray="6 8"/>
+          <path d="M268 86 A140 140 0 0 1 344 170" fill="none" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar2)"/>
+          <path d="M340 262 A140 140 0 0 1 270 338" fill="none" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar2)"/>
+          <path d="M150 338 A140 140 0 0 1 80 262" fill="none" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar2)"/>
+          <path d="M76 170 A140 140 0 0 1 152 86" fill="none" stroke="#8a98ad" stroke-width="2" marker-end="url(#ar2)"/>
+          <rect x="120" y="40" width="180" height="64" rx="14" fill="#2a1626" stroke="#ff4fa3" stroke-width="2"/>
+          <text x="210" y="68" text-anchor="middle" fill="#eef2f8" font-family="Inter,sans-serif" font-size="18" font-weight="600">Трейсы + eval</text>
+          <text x="210" y="92" text-anchor="middle" fill="#ffb3d6" font-family="Inter,sans-serif" font-size="14">сегодняшний шаг</text>
+          <rect x="290" y="182" width="124" height="56" rx="14" fill="#1a2230" stroke="#c8f051" stroke-width="2"/>
+          <text x="352" y="216" text-anchor="middle" fill="#eef2f8" font-family="Inter,sans-serif" font-size="17" font-weight="600">Alignment</text>
+          <rect x="130" y="320" width="160" height="60" rx="14" fill="#1a2230" stroke="#62d6e8" stroke-width="2"/>
+          <text x="210" y="356" text-anchor="middle" fill="#eef2f8" font-family="Inter,sans-serif" font-size="17" font-weight="600">Online evals</text>
+          <rect x="6" y="182" width="124" height="56" rx="14" fill="#1a2230" stroke="#a58bff" stroke-width="2"/>
+          <text x="68" y="216" text-anchor="middle" fill="#eef2f8" font-family="Inter,sans-serif" font-size="17" font-weight="600">Мониторинг</text>
+          <text x="210" y="204" text-anchor="middle" fill="#b6c2d2" font-family="Inter,sans-serif" font-size="15">Signal читает</text>
+          <text x="210" y="226" text-anchor="middle" fill="#b6c2d2" font-family="Inter,sans-serif" font-size="15">результаты evals</text>
+        </svg>
+        <div class="cap">Схема конспекта: цикл после первого судьи</div>
+      </div>
+    </div>
+    <h3 class="reveal">Два тезиса под конец</h3>
+    <p class="reveal">Агента оценивают все стейкхолдеры <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=2020s" target="_blank" rel="noopener">33:40</a>. Соберите в одной комнате продукт, разработку, поддержку, экспертов и безопасность, и пусть каждый опишет успех через свои результаты.</p>
+    <p class="reveal">Метрика и eval нужны вместе <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=2045s" target="_blank" rel="noopener">34:05</a>: метрика сообщает, что что-то может быть сломано, а eval показывает, как именно агент ошибается. Ещё один эксперимент на будущее: переписать вопрос LLM-судьи для decision judge и сравнить, кто справится лучше.</p>
+    <h3 class="reveal">С чего начать</h3>
+    <ol class="actions">
+      <li class="reveal">Включите трейсинг агента: без трейсов оценивать нечего.</li>
+      <li class="reveal">Откройте один-два трейса и ответьте на три вопроса: что просил пользователь, что сделал агент, отправили бы вы такой ответ.</li>
+      <li class="reveal">Выберите одно качество и опишите его как task, success, failure и по три пункта pass и fail.</li>
+      <li class="reveal">Соберите около 20 трейсов в датасет, отфильтровав нужные спаны.</li>
+      <li class="reveal">Напишите одного судью, прогоните его, прочитайте объяснения и правьте рубрику, пока не согласитесь с ним.</li>
+      <li class="reveal">Только потом добавляйте новые evals, alignment по ручной разметке и онлайн-оценку на выборке трафика.</li>
+    </ol>
+    <p class="reveal" style="margin-top:14px;color:var(--muted)">Совет DeLucia в финале <a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=2068s" target="_blank" rel="noopener">34:28</a>: начните с малого, примерно 20 трейсов, одно измерение, один судья.</p>
+  </div>
+</section>
+
+<section id="timeline">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">08</div><h2>Таймлайн</h2><p class="sub">Главы автора и ключевые моменты; миниатюры открываются крупно</p></div>
+    <div class="tl">
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=0s" target="_blank" rel="noopener">00:00</a><h4>Знакомство и план</h4><p>Три цели воркшопа: определение eval, свои критерии, рабочий судья в Arize.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=126s" target="_blank" rel="noopener">02:06</a><h4>Проблема vibe checks</h4><p>Релизы «вроде лучше», регрессии, которые никто не может доказать.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=193s" target="_blank" rel="noopener">03:13</a><h4>Eval против unit-теста</h4><p>Один правильный выход против многих допустимых ответов.</p></div><button class="tl-thumb" data-full="frames/f-0313-slide.png" data-t="193" data-cap="Software tests vs. AI evals" aria-label="Открыть кадр 03:13"><img src="frames/f-0313-slide.png" alt="Кадр 03:13" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=253s" target="_blank" rel="noopener">04:13</a><h4>Почему агенты усложняют задачу</h4><p>Дерево агентов, инструментов и вызовов модели вместо одного спана.</p></div><button class="tl-thumb" data-full="frames/f-0413-slide.png" data-t="253" data-cap="Why agents make this harder" aria-label="Открыть кадр 04:13"><img src="frames/f-0413-slide.png" alt="Кадр 04:13" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=315s" target="_blank" rel="noopener">05:15</a><h4>Типы evals</h4><p>LLM as a judge, decision models, код, аннотации, agent as a judge, фидбек, бизнес-метрики.</p></div><button class="tl-thumb" data-full="frames/f-0515-slide.png" data-t="315" data-cap="Types of evals" aria-label="Открыть кадр 05:15"><img src="frames/f-0515-slide.png" alt="Кадр 05:15" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=449s" target="_blank" rel="noopener">07:29</a><h4>Подготовка воркшопа</h4><p>Аккаунт Arize AX, API-ключ провайдера, демо-проект.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=616s" target="_blank" rel="noopener">10:16</a><h4>Трейсы travel-агента</h4><p>Сценарий, пример запроса, трейс про Прагу за $800.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=860s" target="_blank" rel="noopener">14:20</a><h4>Как читать трейс</h4><p>Root span, спаны как единицы работы, типы спанов.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=989s" target="_blank" rel="noopener">16:29</a><h4>Два LLM-спана подряд</h4><p>Первый выбирает инструмент, второй суммирует его результат.</p></div><button class="tl-thumb" data-full="frames/f-1629-slide.png" data-t="989" data-cap="Трейс в Arize: дерево спанов и маршрут" aria-label="Открыть кадр 16:29"><img src="frames/f-1629-slide.png" alt="Кадр 16:29" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1143s" target="_blank" rel="noopener">19:03</a><h4>Что значит «хорошо»</h4><p>Конкретные критерии, одно качество на eval, 32 evals у Alyx.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1322s" target="_blank" rel="noopener">22:02</a><h4>Критерии pass/fail</h4><p>Шесть пунктов, которые превратятся в промпт судьи.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1457s" target="_blank" rel="noopener">24:17</a><h4>Пример рубрики</h4><p>Travel agent follow-ups, judging: instruction-following.</p></div><button class="tl-thumb" data-full="frames/f-2417-slide.png" data-t="1457" data-cap="Example: travel agent follow-ups" aria-label="Открыть кадр 24:17"><img src="frames/f-2417-slide.png" alt="Кадр 24:17" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1519s" target="_blank" rel="noopener">25:19</a><h4>Датасет из трейсов</h4><p>Root spans или спаны инструмента, фильтры, Add to Dataset.</p></div></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1614s" target="_blank" rel="noopener">26:54</a><h4>Судья в prompt playground</h4><p>Фильтр по essential_info, затем шаблон, метки, GPT-4.1 mini, Save evaluator.</p></div><button class="tl-thumb" data-full="frames/f-2654-slide.png" data-t="1614" data-cap="Фильтр спанов и Add to Dataset" aria-label="Открыть кадр 26:54"><img src="frames/f-2654-slide.png" alt="Кадр 26:54" loading="lazy"></button></div>
+      <div class="tl-item reveal"><div><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1928s" target="_blank" rel="noopener">32:08</a><h4>Что дальше</h4><p>Alyx, Signal, alignment, online evals, мониторинг, старт с 20 трейсов.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section id="quotes">
+  <div class="wrap">
+    <div class="shead reveal"><div class="num">09</div><h2>Цитаты</h2></div>
+    <div class="quotes">
+      <blockquote class="quote reveal"><div class="en">“Traces are the logs for AI. Evals are actual tests.”</div><div class="ru">Трейсы — логи для AI, evals — настоящие тесты.</div><footer><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=241s" target="_blank" rel="noopener">04:01</a></footer></blockquote>
+      <blockquote class="quote reveal"><div class="en">“An eval is better than no eval at all.”</div><div class="ru">Любой eval лучше, чем никакого.</div><footer><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=1286s" target="_blank" rel="noopener">21:26</a></footer></blockquote>
+      <blockquote class="quote reveal"><div class="en">“Every stakeholder evaluates the agent. This is not just one kind of role's job.”</div><div class="ru">Агента оценивает каждый стейкхолдер, а не одна роль.</div><footer><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=2020s" target="_blank" rel="noopener">33:40</a></footer></blockquote>
+      <blockquote class="quote reveal"><div class="en">“A metric tells you that something might be broken, but evals tell you what the actual failure mode is.”</div><div class="ru">Метрика говорит, что что-то может быть сломано, а eval показывает, как именно агент ошибается.</div><footer><a class="tc" href="https://www.youtube.com/watch?v=gv4w23xYj-0&t=2045s" target="_blank" rel="noopener">34:05</a></footer></blockquote>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer class="end">
+  <div>Конспект по оригинальной английской дорожке субтитров и слайдам видео «How to Write Your First AI Eval» (канал AI Engineer). Кадры — вырезки слайдов и экрана из видео 1920×1080.</div>
+</footer>
+
+<div id="lb" role="dialog" aria-modal="true" aria-label="Просмотр кадра">
+  <button class="close" aria-label="Закрыть">×</button>
+  <img alt="">
+  <div class="lb-bar"><div class="lb-cap"></div><a class="figbtn lb-go" target="_blank" rel="noopener" href="#">▶ Смотреть момент</a></div>
+</div>
+
+<script>
+(function(){
+  var V='https://www.youtube.com/watch?v=gv4w23xYj-0';
+  var bar=document.getElementById('progress');
+  var links=[].slice.call(document.querySelectorAll('.nav-links a'));
+  var secs=links.map(function(a){return document.querySelector(a.getAttribute('href'))});
+  function onScroll(){
+    var h=document.documentElement, max=h.scrollHeight-h.clientHeight;
+    bar.style.width=(max>0? (h.scrollTop/max*100):0)+'%';
+    var cur=0;
+    secs.forEach(function(s,i){ if(s && s.getBoundingClientRect().top<120) cur=i; });
+    links.forEach(function(a,i){ a.classList.toggle('active',i===cur); });
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+  var els=document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target);}})},{rootMargin:'0px 0px -8% 0px'});
+    els.forEach(function(e){io.observe(e)});
+  } else els.forEach(function(e){e.classList.add('in')});
+
+  var lb=document.getElementById('lb'), img=lb.querySelector('img'), cap=lb.querySelector('.lb-cap'), go=lb.querySelector('.lb-go');
+  function fmt(s){s=+s;var m=Math.floor(s/60),x=s%60;return (m<10?'0':'')+m+':'+(x<10?'0':'')+x}
+  function open(src,t,c){img.src=src;img.alt=c||'';cap.textContent=c||'';go.href=V+'&t='+t+'s';go.textContent='▶ Смотреть момент '+fmt(t);lb.classList.add('open');document.body.style.overflow='hidden';}
+  function close(){lb.classList.remove('open');img.removeAttribute('src');document.body.style.overflow='';}
+  document.querySelectorAll('[data-full]').forEach(function(el){
+    el.addEventListener('click',function(){open(el.getAttribute('data-full'),el.getAttribute('data-t'),el.getAttribute('data-cap'))});
+  });
+  lb.addEventListener('click',function(e){if(e.target===lb)close();});
+  lb.querySelector('.close').addEventListener('click',close);
+  document.addEventListener('keydown',function(e){if(e.key==='Escape')close();});
+})();
+</script>
+</body>
+</html>
